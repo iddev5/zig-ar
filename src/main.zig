@@ -53,8 +53,8 @@ const Archive = struct {
         var writer = self.fh.writer();
         try writer.writeAll(file_name);
         try writer.writeAll("/");
-        try writer.writeByteNTimes(' ', 16 - file_name.len + 1);
-        try writer.print("{: <10}{: <6}{: <6}{o: <8}{: <10}`\n", .{ 0, 0, 0, stat.mode, stat.size });
+        try writer.writeByteNTimes(' ', 15 - file_name.len);
+        try writer.print("{: <12}{: <6}{: <6}{o: <8}{: <10}`\n", .{ 0, 0, 0, stat.mode, stat.size });
         try writer.writeAll(data);
     }
 };
