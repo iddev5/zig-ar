@@ -6,7 +6,7 @@ const Archive = struct {
     fh: std.fs.File,
     allocator: *Allocator,
 
-    const Header = struct {
+    const Header = packed struct {
         name: [16]u8,
         mtime: [12]u8,
         ownerid: [6]u8,
@@ -14,11 +14,16 @@ const Archive = struct {
         mode: [8]u8,
         size: [10]u8,
     };
+    
+    const ObjectFile = struct {
+        header: Header,
+        contents: ?[]const u8,
+    };
 
     const Self = @This();
 
     pub fn create(name: []const u8, allocator: *Allocator) !Self {
-        const self = Self{
+        var self = Self{
             .name = name,
             .fh = try std.fs.cwd().createFile(name, .{}),
             .allocator = allocator,
@@ -30,11 +35,15 @@ const Archive = struct {
     }
 
     pub fn open(name: []const u8, allocator: *Allocator) !Self {
-        return .{
+        var self = Self{
             .name = name,
             .fh = try std.fs.cwd().openFile(name, .{}),
             .allocator = allocator,
         };
+        
+        try self.read();
+        
+        return self;
     }
 
     pub fn close(self: *Self) void {
@@ -57,6 +66,26 @@ const Archive = struct {
         try writer.print("{: <12}{: <6}{: <6}{o: <8}{: <10}`\n", .{ 0, 0, 0, stat.mode, stat.size });
         try writer.writeAll(data);
     }
+    
+    fn read(self: *Self) !void {
+        var reader = self.fh.reader();
+        
+        var magic = try reader.readBytesNoEof(8);
+        if (!std.mem.eql(u8, &magic, "!<arch>\n"))
+            return error.InvalidArchive;
+        
+        var is_eof = false;    
+        while (!is_eof) {
+            var obj_file: ObjectFile = undefined;
+            obj_file.header = reader.readStruct(Header) catch |err| switch (err) {
+                error.EndOfStream => break,
+                else => |e| return e,
+            };
+        
+            const name = std.mem.trimRight(u8, obj_file.header.name[0..], " /");
+            std.debug.print("name: {s}\n", .{name});
+        }
+    }
 };
 
 pub fn main() anyerror!void {
@@ -66,9 +95,12 @@ pub fn main() anyerror!void {
     const args = try std.process.argsAlloc(allocator);
     defer allocator.free(args);
 
-    var file = try Archive.create(args[1], allocator);
+    // var file = try Archive.create(args[1], allocator);
 
-    for (args[2..]) |file_name| {
-        try file.writeFile(file_name);
-    }
+    // for (args[2..]) |file_name| {
+    //     try file.writeFile(file_name);
+    // }
+    
+    var file = try Archive.open(args[1], allocator);
+    defer file.close();
 }
