@@ -134,7 +134,8 @@ fn parse(self: *Self) !void {
         };
 
         const size = try std.fmt.parseUnsigned(u32, std.mem.trimRight(u8, &obj_file.header.size, " "), 10);
-        obj_file.contents = try readBytesAlloc(reader, self.allocator, size);
+        obj_file.contents = try self.allocator.alloc(u8, size);
+        try reader.readNoEof(obj_file.contents);
 
         try self.objects.append(obj_file);
     }
