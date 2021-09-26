@@ -45,7 +45,7 @@ const Archive = struct {
             .objects = std.ArrayList(ObjectFile).init(allocator),
         };
 
-        try self.read();
+        try self.parse();
 
         return self;
     }
@@ -88,7 +88,7 @@ const Archive = struct {
         }
     }
 
-    fn read(self: *Self) !void {
+    fn parse(self: *Self) !void {
         var reader = self.fh.reader();
 
         var magic = try reader.readBytesNoEof(8);
@@ -103,8 +103,19 @@ const Archive = struct {
                 else => |e| return e,
             };
 
-            const name = std.mem.trimRight(u8, obj_file.header.name[0..], " /");
-            std.debug.print("name: {s}\n", .{name});
+            const size = try std.fmt.parseUnsigned(u32, std.mem.trimRight(u8, &obj_file.header.size, " "), 10);
+            obj_file.contents = try reader.readAllAlloc(self.allocator, size);
+            
+            try self.objects.append(obj_file);
+        }
+    }
+    
+    pub fn print(self: *Self, name: []const u8, writer: std.fs.File.Writer) !void {
+        for (self.objects.items) |item| {
+            if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), name)) {
+                try writer.print("{s}", .{item.contents});
+                break;
+            }
         }
     }
 };
@@ -115,6 +126,8 @@ pub fn main() anyerror!void {
 
     const args = try std.process.argsAlloc(allocator);
     defer allocator.free(args);
+    
+    const stdout = std.io.getStdOut().writer();
     
     if (std.mem.eql(u8, args[1], "r")) {
         var file = try Archive.create(args[2], allocator);
@@ -128,6 +141,7 @@ pub fn main() anyerror!void {
     }
     else {
         var file = try Archive.open(args[2], allocator);
+        try file.print(args[3], stdout);
         defer file.close();
     }
 }
