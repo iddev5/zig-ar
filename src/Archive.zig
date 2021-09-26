@@ -92,6 +92,33 @@ pub fn finalize(self: *Self) !void {
     }
 }
 
+fn readBytesAlloc(reader: std.fs.File.Reader,  allocator: *Allocator, num_bytes: usize) ![]u8 {
+    var index: usize = 0;
+    var array_list = std.ArrayList(u8).init(allocator);
+    try array_list.ensureUnusedCapacity(num_bytes);
+    while (true) {
+        if (index == num_bytes) {
+            return array_list.toOwnedSlice();
+        }
+        
+        const byte = reader.readByte() catch |err| switch (err) {
+            error.EndOfStream => |e| {
+                if (index == 0) {
+                    return e;
+                }
+                else {
+                    return array_list.toOwnedSlice();
+                }
+            },
+            else => |e| return e,
+        };
+        
+        
+        try array_list.append(byte);
+        index += 1;
+    }
+}
+
 fn parse(self: *Self) !void {
     var reader = self.fh.reader();
 
@@ -107,7 +134,7 @@ fn parse(self: *Self) !void {
         };
 
         const size = try std.fmt.parseUnsigned(u32, std.mem.trimRight(u8, &obj_file.header.size, " "), 10);
-        obj_file.contents = try reader.readAllAlloc(self.allocator, size);
+        obj_file.contents = try readBytesAlloc(reader, self.allocator, size);
 
         try self.objects.append(obj_file);
     }
