@@ -14,10 +14,13 @@ pub fn main() anyerror!void {
         var file = try Archive.create(args[2], allocator);
         defer file.close();
 
-        for (args[3..]) |file_name| {
-            try file.addMod(file_name);
-        }
+        try file.addMod(args[3..]);
+        try file.finalize();
+    } else if (std.mem.eql(u8, args[1], "d")) {
+        var file = try Archive.open(args[2], allocator);
+        defer file.close();
 
+        try file.deleteMod(args[3..]);
         try file.finalize();
     } else if (std.mem.eql(u8, args[1], "p")) {
         var file = try Archive.open(args[2], allocator);
@@ -28,16 +31,15 @@ pub fn main() anyerror!void {
         } else {
             try file.print(null, stdout);
         }
-    } else if (std.mem.eql(u8, args[1], "d")) {
-        var file = try Archive.open(args[2], allocator);
-        defer file.close();
-
-        try file.deleteMod(args[3]);
-        try file.finalize();
     } else if (std.mem.eql(u8, args[1], "x")) {
         var file = try Archive.open(args[2], allocator);
         defer file.close();
 
-        try file.extract(&.{args[3]});
+        if (args.len > 3) {
+            try file.extract(&.{args[3]});
+        } else {
+            try file.extract(null);
+        }
+
     }
 }

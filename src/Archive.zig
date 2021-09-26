@@ -57,36 +57,44 @@ pub fn close(self: *Self) void {
     self.fh.close();
 }
 
-pub fn addMod(self: *Self, file_name: []const u8) !void {
-    const obj_file = try std.fs.cwd().openFile(file_name, .{ .read = true });
-    defer obj_file.close();
+pub fn addMod(self: *Self, file_names: ?[][]u8) !void {
+    if (file_names) |names| {
+        for (names) |file_name| {
+            const obj_file = try std.fs.cwd().openFile(file_name, .{ .read = true });
+            defer obj_file.close();
 
-    const data = try obj_file.readToEndAlloc(self.allocator, std.math.maxInt(usize));
-    const stat = try obj_file.stat();
+            const data = try obj_file.readToEndAlloc(self.allocator, std.math.maxInt(usize));
+            const stat = try obj_file.stat();
 
-    const name = try mem.concat(self.allocator, u8, &.{ file_name, "/" });
-    defer self.allocator.free(name);
+            const name = try mem.concat(self.allocator, u8, &.{ file_name, "/" });
+            defer self.allocator.free(name);
 
-    var buf = [_]u8{0} ** @sizeOf(Header);
-    _ = try std.fmt.bufPrint(
-        &buf,
-        "{s: <16}{: <12}{: <6}{: <6}{o: <8}{: <10}`\n",
-        .{ name, 0, 0, 0, stat.mode, stat.size },
-    );
+            var buf = [_]u8{0} ** @sizeOf(Header);
+            _ = try std.fmt.bufPrint(
+                &buf,
+                "{s: <16}{: <12}{: <6}{: <6}{o: <8}{: <10}`\n",
+                .{ name, 0, 0, 0, stat.mode, stat.size },
+            );
 
-    const object = ObjectFile{
-        .header = @ptrCast(*Header, &buf).*,
-        .contents = data,
-    };
+            const object = ObjectFile{
+                .header = @ptrCast(*Header, &buf).*,
+                .contents = data,
+            };
 
-    try self.objects.append(object);
+            try self.objects.append(object);
+        }
+    }
 }
 
-pub fn deleteMod(self: *Self, file_name: []const u8) !void {
-    for (self.objects.items) |item, index| {
-        if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), file_name)) {
-            _ = self.objects.orderedRemove(index);
-            break;
+pub fn deleteMod(self: *Self, file_names: ?[][]u8) !void {
+    if (file_names) |names| {
+        for (names) |file_name| {
+            for (self.objects.items) |item, index| {
+                if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), file_name)) {
+                    _ = self.objects.orderedRemove(index);
+                    break;
+                }
+            }
         }
     }
 }
