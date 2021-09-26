@@ -135,3 +135,19 @@ pub fn print(self: *Self, name: []const u8, writer: std.fs.File.Writer) !void {
         }
     }
 }
+
+pub fn printAll(self: *Self, writer: std.fs.File.Writer) !void {
+    for (self.objects.items) |item| {
+        try writer.print("{s}", .{item.contents});
+    }
+}
+
+pub fn extract(self: *Self, name: []const u8) !void {
+    for (self.objects.items) |item| {
+        if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), name)) {
+            const file = try std.fs.cwd().createFile(name, .{});
+            try file.writeAll(item.contents);
+            break;
+        }
+    }
+}

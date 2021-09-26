@@ -21,13 +21,23 @@ pub fn main() anyerror!void {
         try file.finalize();
     } else if (std.mem.eql(u8, args[1], "p")) {
         var file = try Archive.open(args[2], allocator);
-        try file.print(args[3], stdout);
         defer file.close();
+
+        if (args.len > 3) {
+            try file.print(args[3], stdout);
+        } else {
+            try file.printAll(stdout);
+        }
     } else if (std.mem.eql(u8, args[1], "d")) {
         var file = try Archive.open(args[2], allocator);
         defer file.close();
 
         try file.deleteMod(args[3]);
         try file.finalize();
+    } else if (std.mem.eql(u8, args[1], "x")) {
+        var file = try Archive.open(args[2], allocator);
+        defer file.close();
+
+        try file.extract(args[3]);
     }
 }
