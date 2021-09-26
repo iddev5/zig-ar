@@ -24,9 +24,9 @@ pub fn main() anyerror!void {
         defer file.close();
 
         if (args.len > 3) {
-            try file.print(args[3], stdout);
+            try file.print(&.{args[3]}, stdout);
         } else {
-            try file.printAll(stdout);
+            try file.print(null, stdout);
         }
     } else if (std.mem.eql(u8, args[1], "d")) {
         var file = try Archive.open(args[2], allocator);
@@ -38,6 +38,6 @@ pub fn main() anyerror!void {
         var file = try Archive.open(args[2], allocator);
         defer file.close();
 
-        try file.extract(args[3]);
+        try file.extract(&.{args[3]});
     }
 }

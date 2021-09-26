@@ -127,27 +127,45 @@ fn parse(self: *Self) !void {
     }
 }
 
-pub fn print(self: *Self, name: []const u8, writer: std.fs.File.Writer) !void {
-    for (self.objects.items) |item| {
-        if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), name)) {
-            try writer.print("{s}", .{item.contents});
-            break;
+const OperationErrorSet = Allocator.Error || std.fmt.ParseIntError;
+fn massOperation(self: *Self, file_names: ?[][]u8, data: anytype, cb: fn (item: ObjectFile, index: usize, data: anytype) OperationErrorSet!void) !void {
+    if (file_names) |names| {
+        for (self.objects.items) |item, index| {
+            for (names) |name| {
+                if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), name)) {
+                    try cb(item, index, data);
+                    break;
+                }
+            }
+        }
+    } else {
+        for (self.objects.items) |item, index| {
+            try cb(item, index, data);
         }
     }
 }
 
-pub fn printAll(self: *Self, writer: std.fs.File.Writer) !void {
-    for (self.objects.items) |item| {
-        try writer.print("{s}", .{item.contents});
-    }
+fn printOperation(item: ObjectFile, index: usize, data: anytype) !void {
+    _ = index;
+
+    const writer = data;
+    try writer.print("{s}", .{item.contents});
 }
 
-pub fn extract(self: *Self, name: []const u8) !void {
-    for (self.objects.items) |item| {
-        if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), name)) {
-            const file = try std.fs.cwd().createFile(name, .{});
-            try file.writeAll(item.contents);
-            break;
-        }
-    }
+pub fn print(self: *Self, file_names: ?[][]u8, writer: std.fs.File.Writer) !void {
+    try self.massOperation(file_names, writer, printOperation);
+}
+
+fn extractOperation(item: ObjectFile, index: usize, data: anytype) !void {
+    _ = index;
+    _ = data;
+
+    const file = try std.fs.cwd().createFile(std.mem.trim(u8, &item.header.name, " /"), .{});
+    defer file.close();
+
+    try file.writeAll(item.contents);
+}
+
+pub fn extract(self: *Self, file_names: ?[][]u8) !void {
+    try self.massOperation(file_names, null, extractOperation);
 }
