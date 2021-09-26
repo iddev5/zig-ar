@@ -7,22 +7,27 @@ pub fn main() anyerror!void {
 
     const args = try std.process.argsAlloc(allocator);
     defer allocator.free(args);
-    
+
     const stdout = std.io.getStdOut().writer();
-    
+
     if (std.mem.eql(u8, args[1], "r")) {
         var file = try Archive.create(args[2], allocator);
         defer file.close();
-    
+
         for (args[3..]) |file_name| {
             try file.addMod(file_name);
         }
-        
+
         try file.finalize();
-    }
-    else {
+    } else if (std.mem.eql(u8, args[1], "p")) {
         var file = try Archive.open(args[2], allocator);
         try file.print(args[3], stdout);
         defer file.close();
+    } else if (std.mem.eql(u8, args[1], "d")) {
+        var file = try Archive.open(args[2], allocator);
+        defer file.close();
+
+        try file.deleteMod(args[3]);
+        try file.finalize();
     }
 }

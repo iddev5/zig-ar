@@ -19,7 +19,7 @@ const Header = extern struct {
 
 const ObjectFile = struct {
     header: Header,
-    contents: []const u8,
+    contents: []u8,
 };
 
 const Self = @This();
@@ -32,15 +32,13 @@ pub fn create(name: []const u8, allocator: *Allocator) !Self {
         .objects = std.ArrayList(ObjectFile).init(allocator),
     };
 
-    try self.fh.writeAll("!<arch>\n");
-
     return self;
 }
 
 pub fn open(name: []const u8, allocator: *Allocator) !Self {
     var self = Self{
         .name = name,
-        .fh = try std.fs.cwd().openFile(name, .{}),
+        .fh = try std.fs.cwd().openFile(name, .{ .write = true }),
         .allocator = allocator,
         .objects = std.ArrayList(ObjectFile).init(allocator),
     };
@@ -84,39 +82,27 @@ pub fn addMod(self: *Self, file_name: []const u8) !void {
     try self.objects.append(object);
 }
 
+pub fn deleteMod(self: *Self, file_name: []const u8) !void {
+    for (self.objects.items) |item, index| {
+        if (std.mem.eql(u8, std.mem.trim(u8, &item.header.name, " /"), file_name)) {
+            _ = self.objects.orderedRemove(index);
+            break;
+        }
+    }
+}
+
 pub fn finalize(self: *Self) !void {
+    try self.fh.seekTo(0);
+
     const writer = self.fh.writer();
+    try writer.writeAll("!<arch>\n");
+
     for (self.objects.items) |item| {
         try writer.writeStruct(item.header);
         try writer.writeAll(item.contents);
     }
-}
 
-fn readBytesAlloc(reader: std.fs.File.Reader,  allocator: *Allocator, num_bytes: usize) ![]u8 {
-    var index: usize = 0;
-    var array_list = std.ArrayList(u8).init(allocator);
-    try array_list.ensureUnusedCapacity(num_bytes);
-    while (true) {
-        if (index == num_bytes) {
-            return array_list.toOwnedSlice();
-        }
-        
-        const byte = reader.readByte() catch |err| switch (err) {
-            error.EndOfStream => |e| {
-                if (index == 0) {
-                    return e;
-                }
-                else {
-                    return array_list.toOwnedSlice();
-                }
-            },
-            else => |e| return e,
-        };
-        
-        
-        try array_list.append(byte);
-        index += 1;
-    }
+    try self.fh.setEndPos(try self.fh.getPos());
 }
 
 fn parse(self: *Self) !void {
